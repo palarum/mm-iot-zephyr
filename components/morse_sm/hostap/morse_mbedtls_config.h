@@ -50,6 +50,9 @@
 #define MBEDTLS_PLATFORM_CALLOC_MACRO mmosal_calloc
 #define MBEDTLS_PLATFORM_FREE_MACRO   mmosal_free
 
+#define MBEDTLS_ENTROPY_C
+#define MBEDTLS_ENTROPY_POLL_ZEPHYR
+
 /* Ensure that mbedTLS features that are required for morselib are enabled. */
 #include "mm_mbedtls_config.h"
 
