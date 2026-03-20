@@ -551,7 +551,8 @@ static const struct net_wifi_mgmt_offload morse_api = {
 const struct morse_config conf = {
 	.spi = SPI_DT_SPEC_INST_GET(0,
 				    (SPI_LOCK_ON | SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB |
-				     SPI_WORD_SET(SPI_FRAME_BITS))),
+				     SPI_WORD_SET(SPI_FRAME_BITS)),
+				    0),
 	.resetn = GPIO_DT_SPEC_INST_GET(0, resetn_gpios),
 	.wakeup = GPIO_DT_SPEC_INST_GET(0, wakeup_gpios),
 	.busy = GPIO_DT_SPEC_INST_GET(0, busy_gpios),
