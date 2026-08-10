@@ -18,9 +18,17 @@
         spi-max-frequency = <10000000>;
         reg = <0>;
         
-        busy-gpios = <&hsgpio0 20 GPIO_ACTIVE_HIGH>; 
-        wakeup-gpios = <&hsgpio0 19 GPIO_ACTIVE_HIGH>; 
-        resetn-gpios = <&hsgpio0 25 GPIO_ACTIVE_LOW>; 
-        spi-irq-gpios = <&hsgpio0 1 GPIO_ACTIVE_LOW>; 
+        /* NOTE: these are the sideband pins of the ORIGINAL wiring, and they are
+         * wrong for the Badge_01.00.00 revision, where IRQ/RESET/WAKE/BUSY moved
+         * to GPIO44/45/46/47 (hsgpio1 pins 12/13/14/15). Do not "fix" them here:
+         * this shield is shared with the main app, whose overlay still uses
+         * GPIO44 as the MAX17260 interrupt and GPIO46/47 as LEDs, and any edit in
+         * this module is lost on the next `west update`. The production test
+         * overrides them from app/1Badge/prod_test/boards/fcm363x.overlay, which
+         * is applied after shields. */
+        busy-gpios = <&hsgpio0 20 GPIO_ACTIVE_HIGH>;
+        wakeup-gpios = <&hsgpio0 19 GPIO_ACTIVE_HIGH>;
+        resetn-gpios = <&hsgpio0 25 GPIO_ACTIVE_LOW>;
+        spi-irq-gpios = <&hsgpio0 1 GPIO_ACTIVE_LOW>;
     };
 };

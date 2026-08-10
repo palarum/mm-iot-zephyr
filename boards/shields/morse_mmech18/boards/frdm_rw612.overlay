@@ -1,0 +1,26 @@
+&pinctrl {
+    status = "okay";
+    pinmux_flexcomm1_spi: pinmux_flexcomm1_spi {
+        group0 {
+            pinmux = <IO_MUX_FC1_SPI_SS0>;
+            slew-rate = "ultra";
+        };
+    };
+};
+
+&flexcomm1 {
+    status ="okay";
+    cs-gpios = <&hsgpio0 10 GPIO_ACTIVE_LOW>;
+    
+    morse_wifi_arduino_spi: morse@0 {
+        status ="okay";
+        compatible = "morse,mm8108";
+        spi-max-frequency = <10000000>;
+        reg = <0>;
+        
+        busy-gpios = <&hsgpio0 20 GPIO_ACTIVE_HIGH>; 
+        wakeup-gpios = <&hsgpio0 19 GPIO_ACTIVE_HIGH>; 
+        resetn-gpios = <&hsgpio0 25 GPIO_ACTIVE_LOW>; 
+        spi-irq-gpios = <&hsgpio0 1 GPIO_ACTIVE_LOW>; 
+    };
+};
