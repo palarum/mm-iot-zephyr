@@ -465,6 +465,7 @@ static void morse_iface_init(struct net_if *iface)
 	memcpy(&morse->sta_args, &init_args, sizeof(struct mmwlan_sta_args));
 }
 
+#ifdef CONFIG_PM_DEVICE
 static int morse_pm_action(const struct device *dev, enum pm_device_action action)
 {
 	ARG_UNUSED(dev);
@@ -481,6 +482,7 @@ static int morse_pm_action(const struct device *dev, enum pm_device_action actio
 	}
 	return 0;
 }
+#endif
 
 static int morse_init(const struct device *dev)
 {
@@ -551,8 +553,7 @@ static const struct net_wifi_mgmt_offload morse_api = {
 const struct morse_config conf = {
 	.spi = SPI_DT_SPEC_INST_GET(0,
 				    (SPI_LOCK_ON | SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB |
-				     SPI_WORD_SET(SPI_FRAME_BITS)),
-				    0),
+				     SPI_WORD_SET(SPI_FRAME_BITS))),
 	.resetn = GPIO_DT_SPEC_INST_GET(0, resetn_gpios),
 	.wakeup = GPIO_DT_SPEC_INST_GET(0, wakeup_gpios),
 	.busy = GPIO_DT_SPEC_INST_GET(0, busy_gpios),

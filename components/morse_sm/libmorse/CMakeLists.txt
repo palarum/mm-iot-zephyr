@@ -102,8 +102,7 @@ zephyr_include_directories(
 
 zephyr_library_compile_definitions(
   LOOKAROUND_FAIL_MAX=50
-  MMOSAL_ASSERT\(...\)
-  MMOSAL_ASSERT_LOG_DATA\(...\)
+  MMOSAL_NOASSERT
   MMOSAL_NO_DEBUGLOG
 )
 

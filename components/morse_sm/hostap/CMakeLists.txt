@@ -11,12 +11,9 @@ zephyr_library_sources(
   ${MMIOT_ROOT}/framework/src/hostap/src/common/ptksa_cache.c
   ${MMIOT_ROOT}/framework/src/hostap/src/common/sae.c
   ${MMIOT_ROOT}/framework/src/hostap/src/common/wpa_common.c
-  ${MMIOT_ROOT}/framework/src/hostap/src/crypto/aes-unwrap.c
+  ${MMIOT_ROOT}/framework/src/hostap/src/crypto/des-internal.c  
   ${MMIOT_ROOT}/framework/src/hostap/src/crypto/dh_groups.c
-  ${MMIOT_ROOT}/framework/src/hostap/src/crypto/sha256-kdf.c
-  ${MMIOT_ROOT}/framework/src/hostap/src/crypto/sha384-kdf.c
   ${MMIOT_ROOT}/framework/src/hostap/src/crypto/tls_none.c
-  ${MMIOT_ROOT}/framework/src/hostap/src/crypto/sha512-kdf.c
   ${MMIOT_ROOT}/framework/src/hostap/src/drivers/driver_common.c
   ${MMIOT_ROOT}/framework/src/hostap/src/eap_common/eap_common.c
   ${MMIOT_ROOT}/framework/src/hostap/src/eap_peer/eap.c
@@ -48,7 +45,8 @@ zephyr_library_sources(
   ${MMIOT_ROOT}/framework/src/hostap/wpa_supplicant/wpas_glue.c
   ${MMIOT_ROOT}/framework/src/hostap/wpa_supplicant/bssid_ignore.c
   ${MMIOT_ROOT}/framework/src/hostap/wpa_supplicant/wnm_sta.c
-  ${MMIOT_ROOT}/framework/src/hostap/crypto_mbedtls_mm.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/crypto_mbedtls_psa.c 
+  ${CMAKE_CURRENT_SOURCE_DIR}/supp_psa_api.c  
 )
 
 zephyr_include_directories(
@@ -60,6 +58,7 @@ zephyr_include_directories(
   ${MMIOT_ROOT}/framework/src/hostap/src/utils
   ${MMIOT_ROOT}/framework/src/hostap/wpa_supplicant
   ${MMIOT_ROOT}/framework/src/hostap/src/crypto
+  ${ZEPHYR_BASE}/../modules/lib/hostap/port/mbedtls
 )
 
 set(BUILD_DEFINES
