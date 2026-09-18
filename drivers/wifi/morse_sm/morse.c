@@ -177,6 +177,9 @@ static int morse_mgmt_connect(const struct device *dev, struct wifi_connect_req_
 	memcpy((char *)sta_args->ssid, params->ssid, ssid_len);
 	sta_args->ssid_len = ssid_len;
 
+	BUILD_ASSERT(sizeof(sta_args->bssid) == WIFI_MAC_ADDR_LEN);
+	memcpy(sta_args->bssid, params->bssid, WIFI_MAC_ADDR_LEN);
+
 	if (params->security == WIFI_SECURITY_TYPE_SAE) {
 		size_t psk_len = MIN(sizeof(sta_args->passphrase), params->psk_length);
 		memcpy(sta_args->passphrase, params->psk, psk_len);
