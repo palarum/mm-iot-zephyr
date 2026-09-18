@@ -1,18 +1,49 @@
-# Copyright 2026 Morse Micro
-# SPDX-License-Identifier: Apache-2.0
+config MORSE_HOSTAP_PSA_CRYPTO
+    bool
+    default y
 
-config MBEDTLS
-	bool
-	default y
+    select MBEDTLS
+    select PSA_CRYPTO
 
-config CUSTOM_MBEDTLS_CFG_FILE
-        bool
-	default y
+	select MBEDTLS_CIPHER
+    select MBEDTLS_PKCS5_C
+    select MBEDTLS_MD_C
 
-config MBEDTLS_CFG_FILE
-        string
-	default "morse_mbedtls_config.h"
+    select MBEDTLS_CIPHERSUITE_TLS_ECDHE_PSK_WITH_AES_256_CBC_SHA384
+	select MBEDTLS_CIPHERSUITE_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
 
-config MBEDTLS_ZEPHYR_ENTROPY
-        bool
-	default y
+    select MBEDTLS_PK_WRITE_C
+    select MBEDTLS_NIST_KW_C
+    select MBEDTLS_HAVE_ASM
+    select MBEDTLS_CTR_DRBG_C
+
+    select PSA_WANT_ALG_HKDF
+    select PSA_WANT_ALG_HKDF_EXTRACT
+    select PSA_WANT_ALG_HKDF_EXPAND
+
+    select MBEDTLS_DECLARE_PRIVATE_IDENTIFIERS
+    select PSA_WANT_ALG_ECDH
+    select PSA_WANT_ALG_HMAC
+    select PSA_WANT_ALG_CCM
+    select PSA_WANT_ALG_CTR
+    select PSA_WANT_ALG_SHA_1
+    select PSA_WANT_ALG_SHA_224
+    select PSA_WANT_ALG_SHA_256
+    select PSA_WANT_ALG_SHA_384
+    select PSA_WANT_ALG_SHA_512
+    select PSA_WANT_ALG_PBKDF2_HMAC
+    select PSA_WANT_ALG_CMAC
+    select PSA_WANT_ALG_PBKDF2_AES_CMAC_PRF_128
+    select PSA_WANT_KEY_TYPE_AES
+    select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_IMPORT
+    select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_EXPORT
+    select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_GENERATE
+    select PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY
+    select PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_IMPORT
+    select PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_EXPORT
+    select PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_GENERATE
+    select PSA_WANT_KEY_TYPE_RSA_PUBLIC_KEY
+    select PSA_WANT_KEY_TYPE_DERIVE
+    select PSA_WANT_KEY_TYPE_HMAC
+
+	select PSA_WANT_ECC_SECP_R1_256
