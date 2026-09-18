@@ -1,9 +1,0 @@
-/*
- * Copyright 2025 Morse Micro
- * SPDX-License-Identifier: Apache-2.0
- *
- * Generic MMECH18 shield overlay
- *
- * See boards/shields/morse_mmech18/boards/<board>.overlay
- *
- */
