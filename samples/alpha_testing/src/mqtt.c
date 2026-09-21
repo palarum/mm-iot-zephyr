@@ -259,7 +259,7 @@ int init_mqtt()
 
 	if (!atomic_get(&mqtt_is_connected)) {
 		LOG_ERR("MQTT connect timeout");
-		(void)mqtt_disconnect(&client);
+		(void)mqtt_disconnect(&client, NULL);
 		return rc;
 	}
 	return 0;
