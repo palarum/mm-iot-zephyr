@@ -10,6 +10,7 @@
 #include <zephyr/sys/crc.h>
 #include <stdatomic.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/sys/util.h>
 #include <zephyr/pm/device.h>
 #include "mmhal.h"
 #include "mmosal.h"
@@ -81,18 +82,14 @@ uint32_t mmhal_random_u32(uint32_t min, uint32_t max)
 
 void mmhal_set_deep_sleep_veto(uint8_t veto_id)
 {
-	MMOSAL_ASSERT(veto_id < 32);
-	atomic_fetch_or(&deep_sleep_vetos, 1ul << veto_id);
-	pm_device_busy_set(morse_dev);
+    MMOSAL_ASSERT(veto_id < 32);
+    (void)atomic_fetch_or(&deep_sleep_vetos, BIT(veto_id));
 }
 
 void mmhal_clear_deep_sleep_veto(uint8_t veto_id)
 {
-	MMOSAL_ASSERT(veto_id < 32);
-	atomic_fetch_and(&deep_sleep_vetos, ~(1ul << veto_id));
-	if (deep_sleep_vetos == 0) {
-		pm_device_busy_clear(morse_dev);
-	}
+    MMOSAL_ASSERT(veto_id < 32);
+    (void)atomic_fetch_and(&deep_sleep_vetos, ~BIT(veto_id));
 }
 
 uint32_t mmhal_get_deep_sleep_veto(void)

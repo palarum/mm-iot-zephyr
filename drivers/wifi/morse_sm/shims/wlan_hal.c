@@ -52,8 +52,10 @@ void mmhal_wlan_spi_cs_deassert(void)
 {
 }
 
+volatile uint32_t dbg_spi_rw_count = 0;
 uint8_t mmhal_wlan_spi_rw(uint8_t data)
 {
+	dbg_spi_rw_count++;
 	const struct morse_config *cfg = morse_config0;
 	const struct device *spi = cfg->spi.bus;
 	const struct spi_config *spi_cfg = &cfg->spi.config;
@@ -81,8 +83,12 @@ uint8_t mmhal_wlan_spi_rw(uint8_t data)
 	return read_val;
 }
 
+volatile uint32_t dbg_spi_read_bytes = 0;
+volatile uint32_t dbg_spi_read_buf_count = 0;
 void mmhal_wlan_spi_read_buf(uint8_t *buf, unsigned len)
 {
+	dbg_spi_read_buf_count++;
+	dbg_spi_read_bytes += len;
 	const struct morse_config *cfg = morse_config0;
 	const struct device *spi = cfg->spi.bus;
 	const struct spi_config *spi_cfg = &cfg->spi.config;
@@ -100,8 +106,12 @@ void mmhal_wlan_spi_read_buf(uint8_t *buf, unsigned len)
 	}
 }
 
+volatile uint32_t dbg_spi_write_bytes = 0;
+volatile uint32_t dbg_spi_write_buf_count = 0;
 void mmhal_wlan_spi_write_buf(const uint8_t *buf, unsigned len)
 {
+	dbg_spi_write_buf_count++;
+	dbg_spi_write_bytes += len;
 	const struct morse_config *cfg = morse_config0;
 	const struct device *spi = cfg->spi.bus;
 	const struct spi_config *spi_cfg = &cfg->spi.config;
@@ -169,6 +179,7 @@ void mmhal_wlan_register_spi_irq_handler(mmhal_irq_handler_t handler)
 	spi_irq_handler = handler;
 }
 
+volatile uint32_t dbg_spi_irq_asserted_count = 0;
 bool mmhal_wlan_spi_irq_is_asserted(void)
 {
 	const struct morse_config *cfg = morse_config0;
@@ -178,6 +189,7 @@ bool mmhal_wlan_spi_irq_is_asserted(void)
 		LOG_ERR("Unhandled exception %d in %s\n", ret, __func__);
 		return false;
 	}
+	if (!!ret) { dbg_spi_irq_asserted_count++; }
 	return !!ret;
 }
 
@@ -272,19 +284,30 @@ void mmhal_wlan_set_busy_irq_enabled(bool enabled)
 /**
  * @brief This function handles BUSY interrupt.
  */
-void morse_busy_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+volatile uint32_t dbg_morse_busy_gpio_irq_count = 0;
+
+void morse_busy_cb(const struct device *dev,
+                   struct gpio_callback *cb,
+                   uint32_t pins)
 {
-	if (busy_irq_handler != NULL) {
-		busy_irq_handler();
-	}
+    dbg_morse_busy_gpio_irq_count++;
+
+    if (busy_irq_handler != NULL) {
+        busy_irq_handler();
+    }	
 }
+
 
 /**
  * @brief This function handles SPI IRQ interrupts.
  */
+volatile uint32_t dbg_morse_spi_gpio_irq_count = 0;
+
 void morse_spi_irq_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
-	if (spi_irq_handler != NULL) {
-		spi_irq_handler();
-	}
+    dbg_morse_spi_gpio_irq_count++;
+
+    if (spi_irq_handler != NULL) {
+        spi_irq_handler();
+    }
 }

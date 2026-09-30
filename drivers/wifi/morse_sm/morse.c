@@ -469,20 +469,49 @@ static void morse_iface_init(struct net_if *iface)
 }
 
 #ifdef CONFIG_PM_DEVICE
-static int morse_pm_action(const struct device *dev, enum pm_device_action action)
+
+struct dbg_morse_pm_stats {
+	uint32_t suspend_requests;
+	uint32_t suspend_allowed;
+	uint32_t suspend_denied;
+	uint32_t resume_count;
+
+	uint32_t veto_nonzero_count;
+	uint32_t last_veto;
+};
+
+volatile struct dbg_morse_pm_stats dbg_morse_pm_stats;
+static int morse_pm_action(const struct device *dev,
+			   enum pm_device_action action)
 {
 	ARG_UNUSED(dev);
+
 	switch (action) {
-	case PM_DEVICE_ACTION_SUSPEND:
-		if (mmhal_get_deep_sleep_veto() != 0) {
+	case PM_DEVICE_ACTION_SUSPEND: {
+		uint32_t vetoes = mmhal_get_deep_sleep_veto();
+
+		dbg_morse_pm_stats.suspend_requests++;
+		dbg_morse_pm_stats.last_veto = vetoes;
+
+		if (vetoes != 0) {
+			dbg_morse_pm_stats.suspend_denied++;
+			dbg_morse_pm_stats.veto_nonzero_count++;
 			return -EBUSY;
 		}
+
+		dbg_morse_pm_stats.suspend_allowed++;
 		break;
+	}
+
 	case PM_DEVICE_ACTION_RESUME:
+		dbg_morse_pm_stats.resume_count++;
+		break;
+
 	case PM_DEVICE_ACTION_TURN_OFF:
 	case PM_DEVICE_ACTION_TURN_ON:
 		break;
 	}
+
 	return 0;
 }
 #endif

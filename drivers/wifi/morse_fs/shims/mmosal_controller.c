@@ -588,6 +588,12 @@ struct mmosal_timer *mmosal_timer_create(const char *name, uint32_t timer_period
 		goto exit;
 	}
 
+    printk("MORSE TIMER CREATE: name=%s period=%u ms reload=%u timer=%p\n",
+           name ? name : "(null)",
+           (unsigned int)timer_period_ms,
+           auto_reload ? 1U : 0U,
+           timer);
+
 	timer->period = timer_period_ms;
 	timer->reload = auto_reload;
 	timer->arg = arg;
@@ -615,6 +621,11 @@ bool mmosal_timer_start(struct mmosal_timer *timer)
 		return false;
 	}
 
+    printk("MORSE TIMER START: timer=%p period=%u ms reload=%u\n",
+           timer,
+           (unsigned int)timer->period,
+           timer->reload ? 1U : 0U);
+
 	k_timer_start(&timer->timer, K_MSEC(timer->period),
 		      timer->reload ? K_MSEC(timer->period) : K_FOREVER);
 
@@ -637,7 +648,12 @@ bool mmosal_timer_change_period(struct mmosal_timer *timer, uint32_t new_period)
 	if (timer == NULL) {
 		return false;
 	}
-
+	
+    printk("MORSE TIMER CHANGE: timer=%p %u -> %u ms\n",
+           timer,
+           (unsigned int)timer->period,
+           (unsigned int)new_period);
+		   	
 	timer->period = new_period;
 	mmosal_timer_start(timer);
 
