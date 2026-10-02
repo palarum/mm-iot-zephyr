@@ -520,6 +520,7 @@ static int morse_init(const struct device *dev)
 {
 	struct morse_data *morse = dev->data;
 	const struct morse_config *cfg = dev->config;
+    int ret = 0;
 
 	morse_dev = dev;
 
@@ -535,25 +536,48 @@ static int morse_init(const struct device *dev)
 		LOG_ERR("%s: device %s is not ready", dev->name, cfg->resetn.port->name);
 		return -ENODEV;
 	}
-	gpio_pin_configure_dt(&cfg->resetn, GPIO_OUTPUT_INACTIVE);
+
+    ret = gpio_pin_configure_dt(&cfg->resetn, GPIO_OUTPUT_ACTIVE);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure Morse RESET_N: %d", ret);
+        return ret;
+    }
+	LOG_INF("Morse RESET_N asserted during device init");
 
 	if (!gpio_is_ready_dt(&cfg->wakeup)) {
 		LOG_ERR("%s: device %s is not ready", dev->name, cfg->wakeup.port->name);
 		return -ENODEV;
 	}
-	gpio_pin_configure_dt(&cfg->wakeup, GPIO_OUTPUT_ACTIVE);
+	
+    ret = gpio_pin_configure_dt(&cfg->wakeup, GPIO_OUTPUT_ACTIVE);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure Morse WAKEUP: %d", ret);
+        return ret;
+    }
+	LOG_INF("Morse WAKEUP asserted during device init");
+
 
 	if (!gpio_is_ready_dt(&cfg->busy)) {
 		LOG_ERR("%s: device %s is not ready", dev->name, cfg->busy.port->name);
 		return -ENODEV;
 	}
-	gpio_pin_configure_dt(&cfg->busy, GPIO_INPUT);
+
+    ret = gpio_pin_configure_dt(&cfg->busy, GPIO_INPUT);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure Morse BUSY: %d", ret);
+        return ret;
+    }
 
 	if (!gpio_is_ready_dt(&cfg->spi_irq)) {
 		LOG_ERR("%s: device %s is not ready", dev->name, cfg->spi_irq.port->name);
 		return -ENODEV;
 	}
-	gpio_pin_configure_dt(&cfg->spi_irq, GPIO_INPUT | GPIO_PULL_UP);
+	
+    ret = gpio_pin_configure_dt(&cfg->spi_irq, GPIO_INPUT | GPIO_PULL_UP);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure Morse SPI IRQ: %d", ret);
+        return ret;
+    }
 
 	gpio_pin_interrupt_configure_dt(&cfg->busy, GPIO_INT_DISABLE);
 

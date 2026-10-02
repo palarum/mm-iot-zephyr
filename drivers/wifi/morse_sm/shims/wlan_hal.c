@@ -23,18 +23,27 @@ static const uint8_t spi_ones[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf
 
 void mmhal_wlan_hard_reset(void)
 {
-	const struct morse_config *cfg = morse_config0;
-	const struct gpio_dt_spec *gpio_dt = &cfg->resetn;
-	int ret = 0;
+    const struct morse_config *cfg = morse_config0;
+    const struct gpio_dt_spec *gpio_dt = &cfg->resetn;
+    int ret = 0;
 
-	if ((ret = gpio_pin_set_dt(gpio_dt, 1)) < 0) {
-		LOG_ERR("Unhandled exception %d in %s\n", ret, __func__);
-	}
-	mmosal_task_sleep(5);
-	if ((ret = gpio_pin_set_dt(gpio_dt, 0)) < 0) {
-		LOG_ERR("Unhandled exception %d in %s\n", ret, __func__);
-	}
-	mmosal_task_sleep(20);
+    LOG_INF("MM8108 RESET_N asserting LOW");
+
+    if ((ret = gpio_pin_set_dt(gpio_dt, 1)) < 0) {
+        LOG_ERR("Failed to assert RESET_N: %d", ret);
+    }
+
+    mmosal_task_sleep(5);
+
+    LOG_INF("MM8108 RESET_N releasing HIGH");
+
+    if ((ret = gpio_pin_set_dt(gpio_dt, 0)) < 0) {
+        LOG_ERR("Failed to release RESET_N: %d", ret);
+    }
+
+    mmosal_task_sleep(20);
+
+    LOG_INF("MM8108 RESET_N post-release delay complete");
 }
 
 #if defined(CONFIG_WIFI_MORSE_EXT_XTAL_INIT) && CONFIG_WIFI_MORSE_EXT_XTAL_INIT
