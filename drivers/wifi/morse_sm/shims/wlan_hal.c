@@ -37,6 +37,27 @@ void mmhal_wlan_hard_reset(void)
 	mmosal_task_sleep(20);
 }
 
+/* CME 2026-10-08: recover for mm8108 by pulsing its reset line after
+ * repeated SPI failures
+ */
+#define MORSE_SPI_ERR_RESET_THRESHOLD 10
+static uint32_t morse_spi_err_count;
+
+static void morse_spi_track_result(int ret, const char *op)
+{
+	if (ret < 0) {
+		LOG_ERR("Unhandled error %d in %s\n", ret, op);
+		if (++morse_spi_err_count > MORSE_SPI_ERR_RESET_THRESHOLD) {
+			LOG_WRN("mm8108 SPI failed %u times in a row - pulsing reset line\n",
+				morse_spi_err_count);
+			morse_spi_err_count = 0;
+			mmhal_wlan_hard_reset();
+		}
+	} else {
+		morse_spi_err_count = 0;
+	}
+}
+
 #if defined(CONFIG_WIFI_MORSE_EXT_XTAL_INIT) && CONFIG_WIFI_MORSE_EXT_XTAL_INIT
 bool mmhal_wlan_ext_xtal_init_is_required(void)
 {
@@ -74,9 +95,8 @@ uint8_t mmhal_wlan_spi_rw(uint8_t data)
 		.count = 1,
 	};
 
-	if ((ret = spi_transceive(spi, spi_cfg, &tx, &rx)) < 0) {
-		LOG_ERR("Unhandled error %d in spi_tranceive\n", ret);
-	}
+	ret = spi_transceive(spi, spi_cfg, &tx, &rx);
+	morse_spi_track_result(ret, "spi_transceive");
 
 	return read_val;
 }
@@ -95,9 +115,8 @@ void mmhal_wlan_spi_read_buf(uint8_t *buf, unsigned len)
 		.count = 1,
 	};
 
-	if ((ret = spi_read(spi, spi_cfg, &rx)) < 0) {
-		LOG_ERR("Unhandled error %d in spi_read()\n", ret);
-	}
+	ret = spi_read(spi, spi_cfg, &rx);
+	morse_spi_track_result(ret, "spi_read()");
 }
 
 void mmhal_wlan_spi_write_buf(const uint8_t *buf, unsigned len)
@@ -114,9 +133,8 @@ void mmhal_wlan_spi_write_buf(const uint8_t *buf, unsigned len)
 		.count = 1,
 	};
 
-	if ((ret = spi_write(spi, spi_cfg, &tx)) < 0) {
-		LOG_ERR("Unhandled error %d in spi_write()\n", ret);
-	}
+	ret = spi_write(spi, spi_cfg, &tx);
+	morse_spi_track_result(ret, "spi_write()");
 }
 
 void mmhal_wlan_send_training_seq(void)
