@@ -12,6 +12,62 @@
 #include "morse_log.h"
 LOG_MODULE_DECLARE(LOG_MODULE_NAME);
 
+
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+
+#define MORSE_LED_RED_PIN    17
+#define MORSE_LED_GREEN_PIN   1
+#define MORSE_LED_BLUE_PIN   16
+
+static const struct device *led_gpio1 =
+    DEVICE_DT_GET(DT_NODELABEL(hsgpio1));
+
+static const struct device *led_gpio0 =
+    DEVICE_DT_GET(DT_NODELABEL(hsgpio0));
+
+static bool debug_leds_ready = false;
+
+void morse_debug_led_init(void)
+{
+    if (!device_is_ready(led_gpio1) ||
+        !device_is_ready(led_gpio0)) {
+        return;
+    }
+
+    int r = gpio_pin_configure(
+        led_gpio1, MORSE_LED_RED_PIN, GPIO_OUTPUT_INACTIVE);
+
+    int g = gpio_pin_configure(
+        led_gpio0, MORSE_LED_GREEN_PIN, GPIO_OUTPUT_INACTIVE);
+
+    int b = gpio_pin_configure(
+        led_gpio1, MORSE_LED_BLUE_PIN, GPIO_OUTPUT_INACTIVE);
+
+    debug_leds_ready = (r == 0 && g == 0 && b == 0);
+}
+
+void morse_debug_led_red_on(void)
+{
+    if (debug_leds_ready) {
+        gpio_pin_set(led_gpio1, MORSE_LED_RED_PIN, 1);
+    }
+}
+
+void morse_debug_led_green_on(void)
+{
+    if (debug_leds_ready) {
+        gpio_pin_set(led_gpio0, MORSE_LED_GREEN_PIN, 1);
+    }
+}
+
+void morse_debug_led_blue_on(void)
+{
+    if (debug_leds_ready) {
+        gpio_pin_set(led_gpio1, MORSE_LED_BLUE_PIN, 1);
+    }
+}
+
 /** 10x8bit training seq */
 #define BYTE_TRAIN 16
 
@@ -202,15 +258,15 @@ bool mmhal_wlan_spi_irq_is_asserted(void)
 	return !!ret;
 }
 
+/*
 void mmhal_wlan_set_spi_irq_enabled(bool enabled)
 {
 	const struct morse_config *cfg = morse_config0;
 
 	if (enabled) {
-		/* The transiver will hold the IRQ line low if there is additional information
-		 * to be retrived. Ideally the interrupt pin would be configured as a low level
-		 * interrupt.
-		 */
+		// The transiver will hold the IRQ line low if there is additional information
+		// to be retrived. Ideally the interrupt pin would be configured as a low level
+		// interrupt.
 		if (mmhal_wlan_spi_irq_is_asserted()) {
 			if (spi_irq_handler != NULL) {
 				spi_irq_handler();
@@ -221,11 +277,49 @@ void mmhal_wlan_set_spi_irq_enabled(bool enabled)
 		gpio_pin_interrupt_configure_dt(&cfg->spi_irq, GPIO_INT_DISABLE);
 	}
 }
+*/
+
+void mmhal_wlan_set_spi_irq_enabled(bool enabled)
+{
+    const struct morse_config *cfg = morse_config0;
+
+    if (enabled)
+    {
+        // Arm interrupt detection first.
+        int ret = gpio_pin_interrupt_configure_dt(
+            &cfg->spi_irq,
+            GPIO_INT_EDGE_TO_ACTIVE);
+
+        if (ret < 0)
+        {
+            LOG_ERR("SPI IRQ enable failed: %d", ret);
+            return;
+        }
+
+        // Then handle an IRQ already asserted.
+        // Closes the original check-before-enable window.
+        if (mmhal_wlan_spi_irq_is_asserted())
+        {
+            if (spi_irq_handler != NULL)
+            {
+                spi_irq_handler();
+            }
+        }
+    }
+    else
+    {
+        gpio_pin_interrupt_configure_dt(
+            &cfg->spi_irq,
+            GPIO_INT_DISABLE);
+    }
+}
 
 void mmhal_wlan_init(void)
 {
 	const struct morse_config *cfg = morse_config0;
 	const struct gpio_dt_spec *gpio_dt = &cfg->resetn;
+	morse_debug_led_init();
+
 	int ret = 0;
 	if ((ret = gpio_pin_set_dt(gpio_dt, 1)) < 0) {
 		LOG_ERR("Unhandled exception %d in %s\n", ret, __func__);

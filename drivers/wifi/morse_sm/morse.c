@@ -562,7 +562,7 @@ static int morse_init(const struct device *dev)
 		return -ENODEV;
 	}
 
-    ret = gpio_pin_configure_dt(&cfg->busy, GPIO_INPUT);
+    ret = gpio_pin_configure_dt(&cfg->busy, GPIO_INPUT | GPIO_PULL_DOWN);
     if (ret < 0) {
         LOG_ERR("Failed to configure Morse BUSY: %d", ret);
         return ret;
