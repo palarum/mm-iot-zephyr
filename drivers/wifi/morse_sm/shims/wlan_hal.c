@@ -213,7 +213,12 @@ void mmhal_wlan_set_spi_irq_enabled(bool enabled)
 				spi_irq_handler();
 			}
 		}
-		gpio_pin_interrupt_configure_dt(&cfg->spi_irq, GPIO_INT_EDGE_TO_ACTIVE);
+		/* CME 2026-10-13: GPIO_INT_WAKEUP registers the PINT line as an RW612
+		 * PM2 wake source; without it the edge can't wake the host from PM2
+		 * and the mm8108 handshake desyncs (TX failures, drv task livelock).
+		 */
+		gpio_pin_interrupt_configure_dt(&cfg->spi_irq,
+						GPIO_INT_EDGE_TO_ACTIVE | GPIO_INT_WAKEUP);
 	} else {
 		gpio_pin_interrupt_configure_dt(&cfg->spi_irq, GPIO_INT_DISABLE);
 	}
@@ -281,7 +286,9 @@ void mmhal_wlan_set_busy_irq_enabled(bool enabled)
 	const struct morse_config *cfg = morse_config0;
 
 	if (enabled) {
-		gpio_pin_interrupt_configure_dt(&cfg->busy, GPIO_INT_EDGE_TO_ACTIVE);
+		/* CME 2026-10-13: PM2 wake source, see mmhal_wlan_set_spi_irq_enabled */
+		gpio_pin_interrupt_configure_dt(&cfg->busy,
+						GPIO_INT_EDGE_TO_ACTIVE | GPIO_INT_WAKEUP);
 	} else {
 		gpio_pin_interrupt_configure_dt(&cfg->busy, GPIO_INT_DISABLE);
 	}
