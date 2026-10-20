@@ -6,6 +6,9 @@
 
 #include "mmhal.h"
 #include "mmosal.h"
+#include "mmwlan.h"
+
+#include <stdio.h>
 
 #include "morse.h"
 
@@ -279,9 +282,33 @@ void mmhal_wlan_set_spi_irq_enabled(bool enabled)
 }
 */
 
+/* The MM8108 holds SPI IRQ (low) and BUSY (high) asserted until the host
+ * services them, with no further edge. An edge that arrives while the RW612
+ * is in PM2 can be lost, leaving the driver waiting forever, so both lines
+ * are level triggered by default (Morse's recommendation). A level interrupt
+ * keeps firing while asserted, so each line is masked in its ISR: morselib
+ * re-arms SPI IRQ once it has read INT1_STS, and BUSY is re-armed here on
+ * every WAKE transition. false restores edge triggering for A/B tests; it
+ * takes effect the next time each line is armed.
+ */
+volatile bool morse_hal_level_irqs = true;
+
 void mmhal_wlan_set_spi_irq_enabled(bool enabled)
 {
     const struct morse_config *cfg = morse_config0;
+
+    if (enabled && morse_hal_level_irqs)
+    {
+        unsigned int key = irq_lock();
+        int ret = gpio_pin_interrupt_configure_dt(&cfg->spi_irq, GPIO_INT_LEVEL_ACTIVE);
+
+        irq_unlock(key);
+        if (ret < 0)
+        {
+            LOG_ERR("SPI IRQ enable failed: %d", ret);
+        }
+        return;
+    }
 
     if (enabled)
     {
@@ -336,6 +363,26 @@ void mmhal_wlan_deinit(void)
 	}
 }
 
+static volatile bool busy_irq_wanted;
+static volatile bool wake_asserted;
+volatile uint32_t dbg_morse_wake_assert_count = 0;
+volatile uint32_t dbg_morse_wake_deassert_count = 0;
+volatile uint32_t dbg_morse_wake_changed_ms = 0;
+
+static void busy_irq_arm(void)
+{
+	const struct morse_config *cfg = morse_config0;
+
+	if (!busy_irq_wanted) {
+		return;
+	}
+	unsigned int key = irq_lock();
+
+	gpio_pin_interrupt_configure_dt(&cfg->busy, morse_hal_level_irqs ? GPIO_INT_LEVEL_ACTIVE
+									  : GPIO_INT_EDGE_TO_ACTIVE);
+	irq_unlock(key);
+}
+
 void mmhal_wlan_wake_assert(void)
 {
 	const struct morse_config *cfg = morse_config0;
@@ -343,6 +390,16 @@ void mmhal_wlan_wake_assert(void)
 	int ret = 0;
 	if ((ret = gpio_pin_set_dt(gpio_dt, 1)) < 0) {
 		LOG_ERR("Unhandled exception %d in %s\n", ret, __func__);
+	}
+	wake_asserted = true;
+	dbg_morse_wake_assert_count++;
+	dbg_morse_wake_changed_ms = k_uptime_get_32();
+	/* morse_ps_wait_after_wake_pin_raise() checks BUSY before it waits, so
+	 * only arm for the rising edge it waits on. Arming while BUSY is already
+	 * high would fire at once and leave its wake semaphore given for the
+	 * next wakeup, which would then skip the wait. */
+	if (!mmhal_wlan_busy_is_asserted()) {
+		busy_irq_arm();
 	}
 }
 
@@ -354,6 +411,28 @@ void mmhal_wlan_wake_deassert(void)
 	if ((ret = gpio_pin_set_dt(gpio_dt, 0)) < 0) {
 		LOG_ERR("Unhandled exception %d in %s\n", ret, __func__);
 	}
+	wake_asserted = false;
+	dbg_morse_wake_deassert_count++;
+	dbg_morse_wake_changed_ms = k_uptime_get_32();
+	/* Host is suspending: BUSY now means the MM8108 wants it back. */
+	busy_irq_arm();
+}
+
+bool morse_hal_wake_is_asserted(void)
+{
+	return wake_asserted;
+}
+
+int morse_hal_version_str(char *buf, size_t len)
+{
+	struct mmwlan_version v;
+
+	if (mmwlan_get_version(&v) != MMWLAN_SUCCESS) {
+		return -1;
+	}
+	snprintf(buf, len, "morselib %s  chip fw %s  chip id 0x%08lx", v.morselib_version,
+		 v.morse_fw_version, (unsigned long)v.morse_chip_id);
+	return 0;
 }
 
 bool mmhal_wlan_busy_is_asserted(void)
@@ -377,8 +456,9 @@ void mmhal_wlan_set_busy_irq_enabled(bool enabled)
 {
 	const struct morse_config *cfg = morse_config0;
 
+	busy_irq_wanted = enabled;
 	if (enabled) {
-		gpio_pin_interrupt_configure_dt(&cfg->busy, GPIO_INT_EDGE_TO_ACTIVE);
+		busy_irq_arm();
 	} else {
 		gpio_pin_interrupt_configure_dt(&cfg->busy, GPIO_INT_DISABLE);
 	}
@@ -395,6 +475,9 @@ void morse_busy_cb(const struct device *dev,
 {
     dbg_morse_busy_gpio_irq_count++;
 
+    if (morse_hal_level_irqs) {
+        gpio_pin_interrupt_configure_dt(&morse_config0->busy, GPIO_INT_DISABLE);
+    }
     if (busy_irq_handler != NULL) {
         busy_irq_handler();
     }	
@@ -412,5 +495,7 @@ void morse_spi_irq_cb(const struct device *dev, struct gpio_callback *cb, uint32
 
     if (spi_irq_handler != NULL) {
         spi_irq_handler();
+    } else if (morse_hal_level_irqs) {
+        gpio_pin_interrupt_configure_dt(&morse_config0->spi_irq, GPIO_INT_DISABLE);
     }
 }
