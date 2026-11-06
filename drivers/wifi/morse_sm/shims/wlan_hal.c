@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/sys/reboot.h>
+
 #include "mmhal.h"
 #include "mmosal.h"
+#include "mmdrv.h"   /* morselib internal: mmdrv_host_hw_restart_required(), TX pause */
 
 #include "morse.h"
 
@@ -37,24 +41,76 @@ void mmhal_wlan_hard_reset(void)
 	mmosal_task_sleep(20);
 }
 
-/* CME 2026-10-08: recover for mm8108 by pulsing its reset line after
- * repeated SPI failures
+/* CME 2026-10-08: recover the mm8108 after a run of SPI failures.
+ * CME 2026-11-05: was a bare reset pulse, which left the chip with no firmware. Now:
+ *  1. After MORSE_SPI_ERR_RESET_THRESHOLD errors within MORSE_SPI_ERR_WINDOW_MS, ask morselib for its full
+ *     hardware restart: TX paused, then mmdrv_deinit + mmdrv_init on the event-loop task
+ *     (reset pulse, firmware reload, re-init, reconnect). This is what morselib's own health
+ *     check does on failure, but that check runs at low priority and starves while the
+ *     drv task loops on SPI errors, so it never got to run. Both calls only queue work, so
+ *     they are safe here in the drv task holding the bus lock.
+ *  2. If errors come back to the threshold again after the restart has had
+ *     MORSE_RESTART_GRACE_MS to run, but within MORSE_RESTART_WINDOW_MS of it, the restart
+ *     did not stick (mmdrv_init failure is silent: morselib is built with MMOSAL_NOASSERT),
+ *     so reboot the badge. A reboot always brings HaLow back.
  */
 #define MORSE_SPI_ERR_RESET_THRESHOLD 10
+/* CME 2026-11-05: errors are counted within this window, not only back to back. In a real
+ * storm the failing multi-byte DMA writes alternate with single-byte transfers that still
+ * succeed (they bypass DMA), and those successes kept resetting a "consecutive" count, so
+ * recovery never triggered. An occasional isolated error never reaches the threshold here. */
+#define MORSE_SPI_ERR_WINDOW_MS       5000
+#define MORSE_RESTART_GRACE_MS        15000   /* the restart itself: deinit, reset, firmware, init */
+#define MORSE_RESTART_WINDOW_MS       120000  /* another storm this soon after a restart: reboot */
 static uint32_t morse_spi_err_count;
+static int64_t morse_spi_err_window_start_ms;
+static int64_t morse_restart_requested_at_ms;  /* 0 = no restart requested yet */
+
+static void morse_spi_recover(void)
+{
+	int64_t now_ms = k_uptime_get();
+	int64_t since_restart_ms = now_ms - morse_restart_requested_at_ms;
+
+	/* CME 2026-11-05: only once the chip has booted at least once (morse.c sets the status
+	 * past INTERFACE_DISABLED after mmwlan_boot succeeds). Errors during the first boot run
+	 * inside morse_iface_init at SYS_INIT, before morselib's event loop exists: a restart
+	 * request can't run there, and the reboot that followed turned a HaLow fault into an
+	 * endless boot loop. Let that boot fail instead; the connection manager then reports
+	 * "HaLow failed" and the badge runs without HaLow. */
+	if (morse_data0.status == WIFI_STATE_INTERFACE_DISABLED) {
+		return;
+	}
+
+	if (morse_restart_requested_at_ms != 0 && since_restart_ms < MORSE_RESTART_GRACE_MS) {
+		return;   /* the restart is still running: its own errors don't count */
+	}
+	if (morse_restart_requested_at_ms != 0 && since_restart_ms < MORSE_RESTART_WINDOW_MS) {
+		LOG_ERR("mm8108 still failing %lld ms after a full restart - rebooting the badge\n",
+			since_restart_ms);
+		LOG_PANIC();
+		sys_reboot(SYS_REBOOT_COLD);
+	}
+
+	LOG_WRN("mm8108 SPI failed %u times in %d ms - requesting a full HaLow restart"
+		" (reset + firmware reload)\n", MORSE_SPI_ERR_RESET_THRESHOLD + 1, MORSE_SPI_ERR_WINDOW_MS);
+	morse_restart_requested_at_ms = now_ms;
+	mmdrv_host_set_tx_paused(MMDRV_PAUSE_SOURCE_MASK_HW_RESTART, true);
+	mmdrv_host_hw_restart_required();
+}
 
 static void morse_spi_track_result(int ret, const char *op)
 {
 	if (ret < 0) {
 		LOG_ERR("Unhandled error %d in %s\n", ret, op);
-		if (++morse_spi_err_count > MORSE_SPI_ERR_RESET_THRESHOLD) {
-			LOG_WRN("mm8108 SPI failed %u times in a row - pulsing reset line\n",
-				morse_spi_err_count);
+		int64_t now_ms = k_uptime_get();
+		if (now_ms - morse_spi_err_window_start_ms > MORSE_SPI_ERR_WINDOW_MS) {
+			morse_spi_err_window_start_ms = now_ms;   /* start a new counting window */
 			morse_spi_err_count = 0;
-			mmhal_wlan_hard_reset();
 		}
-	} else {
-		morse_spi_err_count = 0;
+		if (++morse_spi_err_count > MORSE_SPI_ERR_RESET_THRESHOLD) {
+			morse_spi_err_count = 0;
+			morse_spi_recover();
+		}
 	}
 }
 

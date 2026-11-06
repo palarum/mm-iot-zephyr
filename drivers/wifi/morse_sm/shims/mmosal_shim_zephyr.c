@@ -647,7 +647,9 @@ bool mmosal_is_timer_active(struct mmosal_timer *timer)
 		return false;
 	}
 
-	return !!k_timer_remaining_get(&timer->timer);
+	/* CME 2026-11-05: ticks, not ms: k_timer_remaining_get() rounds down, so a timer with
+	 * under 1 ms left read as inactive (skbq.c now relies on this check). */
+	return k_timer_remaining_ticks(&timer->timer) != 0;
 }
 
 int mmosal_printf(const char *format, ...)
