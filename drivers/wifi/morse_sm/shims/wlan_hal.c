@@ -25,6 +25,17 @@ static mmhal_irq_handler_t busy_irq_handler = NULL;
 static const uint8_t spi_ones[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
+// CME 2026-11-20: Rev2c puts C95 (10 uF) on the mm8108 RESET_N, behind R52 (100 ohm), with
+// R51 (100 kohm) to 3V3. The RW612 pad can only source/sink a few mA, so each edge is slew
+// limited: 10 uF * 3.3 V / ~4 mA = ~8 ms, not the 1 ms R52*C95 suggests. Morse's reference
+// 5 ms low / 20 ms settle never fully reset the chip on a Rev2c badge ("Morse Chip Reset
+// Unsuccessful", then "Transport init failed" ~44 ms into mmwlan_boot). Hold reset long
+// enough to fully discharge C95, then wait for the release edge plus the chip's own 20 ms.
+// Costs ~125 ms per hard reset (boot and SPI-storm recovery only). If C95 is changed or
+// removed on the board, these can go back to 5 / 20. Re-ports of this driver drop this.
+#define MORSE_RESET_ASSERT_MS   50
+#define MORSE_RESET_SETTLE_MS   75
+
 void mmhal_wlan_hard_reset(void)
 {
 	const struct morse_config *cfg = morse_config0;
@@ -34,11 +45,11 @@ void mmhal_wlan_hard_reset(void)
 	if ((ret = gpio_pin_set_dt(gpio_dt, 1)) < 0) {
 		LOG_ERR("Unhandled exception %d in %s\n", ret, __func__);
 	}
-	mmosal_task_sleep(5);
+	mmosal_task_sleep(MORSE_RESET_ASSERT_MS);
 	if ((ret = gpio_pin_set_dt(gpio_dt, 0)) < 0) {
 		LOG_ERR("Unhandled exception %d in %s\n", ret, __func__);
 	}
-	mmosal_task_sleep(20);
+	mmosal_task_sleep(MORSE_RESET_SETTLE_MS);
 }
 
 /* CME 2026-10-08: recover the mm8108 after a run of SPI failures.
